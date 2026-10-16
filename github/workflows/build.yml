@@ -1,0 +1,58 @@
+name: Build PS2 Homebrew
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Baixar o código
+        uses: actions/checkout@v4
+
+      - name: Instalar ferramenta ISO
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y genisoimage
+
+      - name: Compilar ELF com PS2DEV
+        run: |
+          docker run --rm \
+            -v "$GITHUB_WORKSPACE:/src" \
+            -w /src \
+            ghcr.io/ps2dev/ps2dev:latest \
+            sh -lc 'make clean && make'
+
+      - name: Montar a imagem ISO
+        run: |
+          test -s OPLTEST.ELF
+          mkdir -p dist
+          cp OPLTEST.ELF SYSTEM.CNF dist/
+          genisoimage \
+            -o OPLTEST.iso \
+            -V OPLTEST \
+            -sysid PLAYSTATION \
+            -iso-level 2 \
+            -l \
+            dist
+
+      - name: Conferir os arquivos
+        run: |
+          test -s OPLTEST.ELF
+          test -s OPLTEST.iso
+          file OPLTEST.ELF OPLTEST.iso
+          ls -lh OPLTEST.ELF OPLTEST.iso
+
+      - name: Disponibilizar os arquivos
+        uses: actions/upload-artifact@v4
+        with:
+          name: OPLTEST-PS2
+          path: |
+            OPLTEST.ELF
+            OPLTEST.iso
